@@ -1,6 +1,6 @@
-using DemTools
 using Documenter
 using DocumenterVitepress
+using DemTools
 
 repo = "github.com/utkinis/DemTools.jl"
 devbranch = "main"
@@ -16,4 +16,4 @@ makedocs(;
                 "API reference" => "api.md"],
          checkdocs=:exports)
 
-deploydocs(; repo, devbranch, push_preview=true)
+DocumenterVitepress.deploydocs(; repo, devbranch, push_preview=true)
