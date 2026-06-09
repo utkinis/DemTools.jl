@@ -1,0 +1,33 @@
+name: Format
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/format.yml"
+      - ".JuliaFormatter.toml"
+      - "**/*.jl"
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths:
+      - ".github/workflows/format.yml"
+      - ".JuliaFormatter.toml"
+      - "**/*.jl"
+  workflow_dispatch:
+
+concurrency:
+  group: format-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  code-style:
+    permissions:
+      contents: read
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: julia-actions/julia-format@v4
+        with:
+          version: "1"
+          paths: "src/, test/, docs/, examples/"
