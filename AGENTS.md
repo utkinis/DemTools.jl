@@ -6,6 +6,7 @@
 - The code should be concise, and use vectorised array programming with broadcasting and `@.` when possible and when makes the code shorter.
 - Prefer not to add dependencies, instead implement new functions from scratch. The exception are Julia Base libraries, use the standard functions whenever possible.
 - Always add inline short code comments for maintainers explaining how the code works.
+- Use short variable names, Greek letters are allowed.
 
 ## New features
 
