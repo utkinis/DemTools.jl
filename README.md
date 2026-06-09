@@ -1,4 +1,4 @@
-[![Documentation](https://img.shields.io/badge/docs-dev-blue.svg)](https://utkinis.github.io/DemTools.jl/dev/)
+[![Documentation](https://img.shields.io/badge/docs-dev-blue.svg)](https://utkinis.github.io/DemTools.jl/)
 
 # <img src="docs/src/assets/logo.png" width="42" align="center" alt="DemTools.jl logo"> DemTools.jl
 
