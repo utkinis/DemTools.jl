@@ -24,13 +24,13 @@ function laplacian_filter!(dem::AbstractMatrix, wavelength, reduction; h=1, cfl=
     eltype(dem) <: AbstractFloat ||
         throw(ArgumentError("dem must have a floating-point element type for in-place filtering"))
 
-    dt = cfl * h^2 # Stable explicit timestep for an isotropic grid.
+    dtmax = cfl * h^2 # Largest stable explicit timestep for an isotropic grid.
     t = -log(reduction) * wavelength^2 / (4π^2) # Diffusion time for target damping.
-    n = ceil(Int, t / dt) # Round up so the requested damping is reached.
+    n = ceil(Int, t / dtmax) # Round up to keep each explicit step stable.
     n == 0 && return dem
 
     buf = similar(dem) # Buffer stores the next explicit diffusion state.
-    α = dt / h^2
+    α = (t / n) / h^2 # Use the exact target time split across stable steps.
     for _ in 1:n
         _laplacian_step!(buf, dem, α)
         dem, buf = buf, dem # Swap buffers without reallocating each step.

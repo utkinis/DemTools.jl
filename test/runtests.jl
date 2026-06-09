@@ -22,6 +22,12 @@ roughness(z) = sum(abs2, diff(z; dims=1)) + sum(abs2, diff(z; dims=2))
     @test eltype(laplacian_filter(ints, 5, 0.5)) <: AbstractFloat
     @test_throws ArgumentError laplacian_filter!(ints, 5, 0.5)
 
+    spike = zeros(3, 3)
+    spike[2, 2] = 1
+    λ, r = 4, 0.95
+    α = (-log(r) * λ^2 / (4π^2)) # One scaled step because α < default cfl.
+    @test laplacian_filter(spike, λ, r)[2, 2] ≈ 1 - 4α
+
     x = range(0, 2π; length=50)
     noisy = [sin(xi) + cos(yj) + 0.2sin(15xi + 9yj) for xi in x, yj in x]
     smooth = laplacian_filter(noisy, 4, 0.1)
