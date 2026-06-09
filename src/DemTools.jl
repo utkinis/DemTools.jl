@@ -1,5 +1,7 @@
 module DemTools
 
-greet() = print("Hello World!")
+export laplacian_filter, laplacian_filter!
+
+include("filtering.jl")
 
 end # module DemTools
