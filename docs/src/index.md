@@ -17,11 +17,15 @@ pkg> activate .
 pkg> instantiate
 ```
 
-## Laplacian smoothing tutorial
+## Tutorial examples
 
-The example below builds a synthetic DEM with long hills and short-wavelength roughness, then removes part of that roughness with [`laplacian_filter`](@ref).
+These examples show the three main workflows in DemTools.jl: filtering a noisy DEM, resampling a coarse DEM, and filtering before coarsening to avoid aliasing.
 
-```@example getting-started
+### Filtering
+
+Use [`laplacian_filter`](@ref) to damp short-wavelength terrain while keeping broader structure. Increasing the damping makes the high-frequency roughness fade more strongly.
+
+```@example getting-started-filtering
 using CairoMakie
 using DemTools
 
@@ -29,33 +33,93 @@ h = 20.0
 x = range(0, 2000; step=h)
 y = range(0, 2000; step=h)
 
-dem = [120sin(2π * xi / 1600) + 70cos(2π * yj / 1100) + 8sin(2π * (xi + yj) / 180) for xi in x, yj in y] # Synthetic terrain mixes long hills and short roughness.
-flt = laplacian_filter(dem, 180, 0.2; h)
-res = dem .- flt # Residual shows terrain removed by the filter.
+dem = [100sin(2π * xi / 1500) +
+       50cos(2π * yj / 1000) +
+       25sin(2π * (xi - yj) / 500) +
+       20cos(2π * (xi + 0.5yj) / 150) for xi in x, yj in y]
+cases = (("Original", dem),
+         ("Mild", laplacian_filter(dem, 160.0, 0.5; h)),
+         ("Strong", laplacian_filter(dem, 160.0, 0.03; h)))
 
-(minimum(dem), maximum(dem), minimum(flt), maximum(flt), maximum(abs, res))
-```
-
-The original DEM contains broad hills plus short-wavelength terrain roughness.
-
-```@example getting-started
-fig = Figure(; size=(500, 400))
-ax = Axis(fig[1, 1]; title="Original DEM", aspect=DataAspect(), xlabel="x (m)", ylabel="y (m)")
-hm = heatmap!(ax, x, y, dem; colormap=:terrain)
-Colorbar(fig[1, 2], hm; label="Elevation (m)")
+fig = Figure(; size=(800, 260))
+zlim = extrema(dem)
+for (k, (label, z)) in enumerate(cases)
+    ax = Axis(fig[1, k]; title=label, aspect=DataAspect())
+    heatmap!(ax, x, y, z; colormap=:terrain, colorrange=zlim)
+    hidedecorations!(ax)
+end
+Colorbar(fig[1, end + 1]; colormap=:terrain, limits=zlim, label="Elevation (m)")
 fig
 ```
 
-The filtered DEM keeps the long terrain signal while damping the chosen short wavelength.
+### Resampling
 
-```@example getting-started
-fig = Figure(; size=(500, 400))
-ax = Axis(fig[1, 1]; title="Filtered DEM", aspect=DataAspect(), xlabel="x (m)", ylabel="y (m)")
-hm = heatmap!(ax, x, y, flt; colormap=:terrain)
-Colorbar(fig[1, 2], hm; label="Elevation (m)")
+Use [`resample`](@ref) to change DEM spacing. This coarse input makes interpolation differences visible: bilinear interpolation creates simpler transitions, while bicubic interpolation is smoother.
+
+```@example getting-started-resampling
+using CairoMakie
+using DemTools
+
+hin = 200.0
+hout = 50.0
+x = range(0, 2100; step=hin)
+y = range(0, 2100; step=hin)
+
+dem = [130sin(2π * xi / 1800) +
+       80cos(2π * yj / 1400) +
+       45sin(2π * (xi + 0.4yj) / 900) for xi in x, yj in y]
+algs = (:bilinear, :bicubic)
+
+fig = Figure(; size=(800, 260))
+zlim = extrema(dem)
+
+ax0 = Axis(fig[1, 1]; title="Input, 120 m", aspect=DataAspect())
+heatmap!(ax0, x, y, dem; colormap=:terrain, colorrange=zlim)
+hidedecorations!(ax0)
+
+for (r, alg) in enumerate(algs)
+    z = resample(dem, hin, hout, alg)
+    xo = range(first(x), last(x); length=size(z, 1))
+    yo = range(first(y), last(y); length=size(z, 2))
+    ax = Axis(fig[1, r + 1]; title=string(alg, ", 20 m"), aspect=DataAspect())
+    heatmap!(ax, xo, yo, z; colormap=:terrain, colorrange=zlim)
+    hidedecorations!(ax)
+end
+Colorbar(fig[1, end + 1]; colormap=:terrain, limits=zlim, label="Elevation (m)")
 fig
 ```
 
-The `wavelength` argument sets the feature scale to attenuate. The `reduction` argument sets the target amplitude left at that wavelength, so `0.2` keeps about 20% of the selected short-scale signal.
+### Filtering Before Resampling
 
-Use [`laplacian_filter`](@ref) when you want a filtered copy and [`laplacian_filter!`](@ref) when it is safe to modify a floating-point DEM in place.
+When coarsening a DEM, short waves can fold into false broad patterns. Applying [`Laplacian`](@ref) before resampling removes much of that aliasing.
+
+```@example getting-started-aliasing
+using CairoMakie
+using DemTools
+
+hin = 20.0
+hout = 100.0
+x = range(0, 2000; step=hin)
+y = range(0, 2000; step=hin)
+
+dem = [100sin(2π * xi / 1500) +
+       50cos(2π * yj / 1000) +
+       25sin(2π * (xi - yj) / 500) +
+       20cos(2π * (xi + 0.5yj) / 150) for xi in x, yj in y]
+raw = resample(dem, hin, hout, :bicubic, NoFilter())
+flt = resample(dem, hin, hout, :bicubic, Laplacian(180.0, 0.03))
+
+fig = Figure(; size=(800, 260))
+zlim = extrema(dem)
+cases = (("Input, 20 m", dem, x, y),
+         ("no filter", raw, range(first(x), last(x); length=size(raw, 1)), range(first(y), last(y); length=size(raw, 2))),
+         ("Laplacian filter", flt, range(first(x), last(x); length=size(flt, 1)), range(first(y), last(y); length=size(flt, 2))))
+
+for (r, (label, z, xo, yo)) in enumerate(cases)
+    ax = Axis(fig[1, r]; title=label, aspect=DataAspect())
+    heatmap!(ax, xo, yo, z; colormap=:terrain, colorrange=zlim)
+    hidedecorations!(ax)
+end
+Colorbar(fig[1, end + 1]; colormap=:terrain, limits=zlim, label="Elevation (m)")
+fig
+```
